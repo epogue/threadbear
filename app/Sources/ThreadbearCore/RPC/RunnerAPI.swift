@@ -565,6 +565,13 @@ public extension RPCClient {
         }
     }
 
+    /// Puts the runners in this order (every runner's id, this one's too):
+    /// the one order the phone sets as well. It comes back in
+    /// `remoteThreads.updated`.
+    func setRunnerOrder(_ runnerIds: [String]) async throws {
+        _ = try await call("runners.setOrder", .object(["runnerIds": .array(runnerIds.map { .string($0) })]), as: EmptyResult.self)
+    }
+
     /// Runs it now, as if it were due, even when paused. Another runner's
     /// schedule comes back `queued`, with no thread: that runner runs it.
     func runSchedule(_ scheduleId: String) async throws -> ScheduleRunResult {
@@ -861,6 +868,29 @@ public struct ProjectUpdate: Sendable, Hashable {
         if let archived { params["archived"] = .bool(archived) }
         if let notion { params["notion"] = .string(notion) }
         return params
+    }
+
+    /// The project as it will be once the runner has made this change, so
+    /// a save shows straight away however slow the runner is. Its reply
+    /// replaces the guess. A different Notion page has a board nobody has
+    /// read yet, so the old one goes.
+    public func applied(to project: Project, now: Date = Date()) -> Project {
+        var project = project
+        if let title, !title.isEmpty { project.title = title }
+        if let folders { project.folders = folders }
+        if let goals { project.goals = goals }
+        if let state {
+            project.state = state
+            project.stateUpdatedAt = now
+        }
+        if let notes { project.notes = notes }
+        if let archived { project.archived = archived }
+        if let notion {
+            let link = notion.isEmpty ? nil : notion
+            if link != project.notion { project.tasks = nil }
+            project.notion = link
+        }
+        return project
     }
 }
 

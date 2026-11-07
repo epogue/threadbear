@@ -113,6 +113,26 @@ deleted. Otherwise both stay, with a `system.note` saying so and how to
 land or drop them. Unarchiving a thread whose worktree was removed starts
 its next turn in the main checkout, with a note.
 
+An archive's cleanup waits for the thread's turn-end hooks, which run in that
+folder: on 7 Nov a typecheck lost its files partway through, "failed", and
+woke the thread just archived. A restart waits for those hooks and a handover
+keeps the thread while they run, for the same reason. A hook failure told to
+the agent brings the thread back in its worktree, so nothing gets removed; one
+that isn't told (`tell: "never"`, or past the limit) leaves it archived and the
+cleanup goes ahead. If the runner stops or crashes first, the next one does the
+cleanup (`cleanupOwed` in the worktree's record). Deleting a thread doesn't
+wait: nothing is left to report a hook's result to.
+
+The folder is only removed while it's still a checkout of the thread's own
+branch: slot folders are reused, and a record can miss hearing its worktree
+went (THREADBEAR-16, 6 Nov: a handover saved it while the cleanup ran; a
+handover now keeps that thread until the cleanup is done, for up to ten
+minutes, while the rest move across). A folder that's
+another checkout's now is left alone and the thread treats it as a spare's.
+At start, an archived thread whose branch is gone, and whose folder is gone
+or another checkout's, is marked removed. A message sent while the cleanup
+runs waits for it, so the turn never starts in a folder being removed.
+
 ## Reusing worktrees
 
 Mike, 2026-10-29: removing a sound effect took a thread 18 minutes, 17 of
