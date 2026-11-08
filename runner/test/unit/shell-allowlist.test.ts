@@ -17,6 +17,17 @@ import { runCommand } from '../../src/patches.ts';
 import { liveCommandProblem, namedPaths, PatchTrust, scanModule } from '../../src/patch-trust.ts';
 import { allowCommand, liveCommandEnv, ownedPathProblem, repoGitConfigProblem } from '../../src/shell-allowlist.ts';
 
+// Runs a shell command and fails the test if it was cut off. These tests
+// check whether a git command ran a planted script, so a run killed for
+// taking too long reads as "it didn't run": the controls failed that way at
+// a load of 30 when this limit was 20 seconds (8 Nov), and a check that
+// should fail could pass. The limit only stops a hung command holding the run.
+function shFinished(cmd: string, opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string }) {
+  const r = spawnSync('/bin/sh', ['-c', cmd], { ...opts, timeout: 150_000 });
+  assert.equal(r.error, undefined, `${cmd} didn't finish: ${r.error?.message}`);
+  return r;
+}
+
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-C', cwd, ...args], { stdio: 'pipe' }).toString();
 
 function write(folder: string, files: Record<string, string>): void {
@@ -726,7 +737,7 @@ test("R5: liveCommandEnv's settings beat the repo's own config, so the attacks i
   const env: Record<string, string | undefined> = { ...process.env, GIT_CONFIG_GLOBAL: path.join(root, 'no-global'), GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' };
   // Nothing of the test host's own that would hide an attack.
   for (const k of ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_SSH_COMMAND', 'GIT_SSH', 'GIT_CONFIG_COUNT']) delete env[k];
-  const sh = (cmd: string, withEnv: boolean) => spawnSync('/bin/sh', ['-c', cmd], { cwd: repo, env: (withEnv ? { ...env, ...liveCommandEnv(env) } : env) as NodeJS.ProcessEnv, timeout: 20_000, input: '' });
+  const sh = (cmd: string, withEnv: boolean) => shFinished(cmd, { cwd: repo, env: (withEnv ? { ...env, ...liveCommandEnv(env) } : env) as NodeJS.ProcessEnv, input: '' });
   const ran = () => {
     const r = fs.existsSync(marker);
     fs.rmSync(marker, { force: true });
@@ -830,11 +841,11 @@ test("R5: a repo's filter drivers don't run: its own are refused, and your own d
   const e = { ...env, ...liveCommandEnv(env) } as NodeJS.ProcessEnv;
   for (const cmd of ['git merge-base --is-ancestor HEAD HEAD', 'git rev-list --count HEAD', "git branch -a --no-merged HEAD --format='%(refname:short)'"]) {
     assert.equal(live(repo, cmd).problem, undefined, cmd);
-    spawnSync('/bin/sh', ['-c', cmd], { cwd: repo, env: e, timeout: 20_000 });
+    shFinished(cmd, { cwd: repo, env: e });
     assert.equal(fs.existsSync(marker), false, cmd);
   }
   // (The same global filter does run for git status, which isn't on the list.)
-  spawnSync('/bin/sh', ['-c', 'git status --porcelain'], { cwd: repo, env: e, timeout: 20_000 });
+  shFinished('git status --porcelain', { cwd: repo, env: e });
   assert.equal(fs.existsSync(marker), true, 'the test plays it right');
 });
 
