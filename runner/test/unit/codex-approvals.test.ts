@@ -102,6 +102,13 @@ const req = (command: string, extra: Partial<CommandExecutionRequestApprovalPara
 
 const CWD = '/work/proj';
 
+// Rules go by the file PATH finds for a name, and give up on a relative or
+// empty PATH entry (ruleMayCover). A host whose own PATH has one ahead of
+// /usr/bin (a literal `~/.bun/bin`, or `::`) failed every test that expects
+// a rule, so this file starts from the system's folders; the tests that are
+// about PATH change it themselves.
+process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
+
 test('rules: exactly the command shown, in its folder, never Codex\'s proposed prefix', () => {
   assert.equal(ruleFor(req('touch b.txt', { proposedExecpolicyAmendment: ['touch', 'b.txt'] }), CWD), commandRule(['touch', 'b.txt'], CWD));
   // F6/F16: the amendment can be shorter than the command; the rule never is.
