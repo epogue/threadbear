@@ -844,8 +844,12 @@ test("R5: a repo's filter drivers don't run: its own are refused, and your own d
     shFinished(cmd, { cwd: repo, env: e });
     assert.equal(fs.existsSync(marker), false, cmd);
   }
-  // (The same global filter does run for git status, which isn't on the list.)
-  shFinished('git status --porcelain', { cwd: repo, env: e });
+  // (The same global filter does run for git diff, which isn't on the list.
+  // Not git status: it hashes a size-changed file only when its timestamp is
+  // racy, so it ran the filter only when the commit and the append above
+  // fell in the same second, and a slow host failed this.)
+  assert.notEqual(live(repo, 'git diff --quiet').problem, undefined);
+  shFinished('git diff --quiet', { cwd: repo, env: e });
   assert.equal(fs.existsSync(marker), true, 'the test plays it right');
 });
 
