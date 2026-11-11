@@ -20,6 +20,13 @@ import { z } from 'zod';
 
 const FAKE = path.join(import.meta.dirname, '..', 'helpers', 'fake-acp-agent.mjs');
 
+// Command rules go by the file PATH finds for a name, and give up on a
+// relative or empty PATH entry. A host whose own PATH has one ahead of
+// /usr/bin (a literal `~/.bun/bin`, or `::`) failed the tests that expect a
+// rule, so this file starts from this Node's folder (the fake agent is a
+// `#!/usr/bin/env node` script) and the system's folders.
+process.env.PATH = [path.dirname(process.execPath), '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
+
 // Real folders on the temp volume, as adapters compare and resolve them.
 function tmp(): string {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tb-acp-')));
