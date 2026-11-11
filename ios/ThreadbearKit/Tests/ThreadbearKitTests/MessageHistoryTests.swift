@@ -106,7 +106,9 @@ import Testing
         // What went can be loaded again.
         #expect(h.nextBefore == h.older.first?.seq)
         // 1,251 updates; well under a tenth of a millisecond each would do.
-        #expect(took < .seconds(2), "took \(took)")
+        // About 0.2s normally, but check.sh on a Mac with no check host runs
+        // at background priority (taskpolicy -b), where it took 3 to 4s.
+        #expect(took < .seconds(10), "took \(took)")
     }
 
     @Test func aLongStreamOfSmallRowsKeepsOlderWithinItsRowCap() {
